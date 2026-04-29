@@ -116,7 +116,7 @@ export default function ParentAccount() {
         </div>
 
         <div className="card">
-          <div className="card-title">⚠️ Active Alerts</div>
+          <div className="card-title">Active Alerts</div>
           {alerts.length === 0 ? (
             <div className="empty-state">No active alerts for Jane.</div>
           ) : alerts.map((a) => (
@@ -135,7 +135,7 @@ export default function ParentAccount() {
 
       <div className="card section-gap">
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
-          <div className="card-title" style={{ margin:0 }}>💵 Allowance Settings</div>
+          <div className="card-title" style={{ margin:0 }}>Allowance Settings</div>
           <button className="btn btn-primary btn-sm" onClick={() => setAddingAllow(true)}>+ Add Allowance</button>
         </div>
 
@@ -175,7 +175,7 @@ export default function ParentAccount() {
       </div>
 
       <div className="card section-gap">
-        <div className="card-title">📋 Jane's Recent Transactions</div>
+        <div className="card-title">Jane's Recent Transactions</div>
         <div className="table-wrap">
           <table>
             <thead>

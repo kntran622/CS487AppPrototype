@@ -10,12 +10,12 @@ import "./index.css";
 type Page = "dashboard" | "transactions" | "budget" | "alerts" | "investment";
 type AccountMode = "teen" | "parent";
 
-const TEEN_NAV: { id: Page; label: string; icon: string }[] = [
-  { id:"dashboard",    label:"Dashboard",        icon:"🏠" },
-  { id:"transactions", label:"Transactions",     icon:"💳" },
-  { id:"budget",       label:"Budget & Goals",   icon:"🎯" },
-  { id:"alerts",       label:"Alerts & Calendar",icon:"🔔" },
-  { id:"investment",   label:"Investment",       icon:"📈" },
+const TEEN_NAV: { id: Page; label: string; }[] = [
+  { id:"dashboard",    label:"Dashboard"        },
+  { id:"transactions", label:"Transactions"     },
+  { id:"budget",       label:"Budget & Goals"   },
+  { id:"alerts",       label:"Alerts & Calendar"},
+  { id:"investment",   label:"Investment"       },
 ];
 
 export default function App() {
@@ -60,7 +60,7 @@ export default function App() {
             <div className="sidebar-name">{isParent ? "Pat Doe" : "Jane Doe"}</div>
             <div className="sidebar-email">{isParent ? "patdoe@gmail.com" : "janedoe@gmail.com"}</div>
             <div style={{ fontSize:"0.72rem", color:"var(--text-light)", marginTop:4 }}>
-              {isParent ? "👨‍👧 Parent Account" : "👤 Teen Account"} ▾
+              {isParent ? "Parent Account" : "Teen Account"} ▾
             </div>
           </div>
 
@@ -110,7 +110,6 @@ export default function App() {
         {!isParent && TEEN_NAV.map((n) => (
           <button key={n.id} className={`nav-btn ${page === n.id ? "active" : ""}`}
             onClick={() => setPage(n.id)}>
-            <span className="icon">{n.icon}</span>
             {n.label}
           </button>
         ))}
