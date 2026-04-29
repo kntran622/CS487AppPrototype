@@ -1,57 +1,83 @@
 import { useEffect, useState } from "react";
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from "recharts";
 import { api } from "../api";
 
-const COLORS = ["#52b788","#2d6a4f","#b7e4c7","#40916c","#74c69d","#1b4332"];
-
-const CATEGORY_LABELS: Record<string, string> = {
-  Food: "Food", Housing: "Housing", School: "School",
-  Games: "Games", Play: "Play", Other: "Other",
+export const CATEGORY_COLORS: Record<string, string> = {
+  Food:     "#3a9a5c",
+  Housing:  "#3b82f6",
+  School:   "#f59e0b",
+  Games:    "#8b5cf6",
+  Play:     "#f97316",
+  Income:   "#10b981",
+  Other:    "#9ca3af",
 };
+const DEFAULT_COLOR = "#9ca3af";
 
-interface Account  { id: number; nickname: string; type: string; balance: number }
-interface Summary  { category: string; total: number }
-interface Bill     { id: number; name: string; amount: number; due_date: string; recurring: number; frequency: string; category: string; paid: number }
-interface Health   { score: number; income: number; expenses: number; savings: number }
+function monthStr(offset: number) {
+  const d = new Date();
+  d.setMonth(d.getMonth() + offset);
+  return d.toISOString().slice(0, 7);
+}
+
+function monthLabel(ym: string) {
+  const [y, m] = ym.split("-");
+  return new Date(parseInt(y), parseInt(m) - 1).toLocaleString("en-US", { month: "long", year: "numeric" });
+}
 
 export default function Dashboard() {
-  const [accounts, setAccounts]   = useState<Account[]>([]);
-  const [summary,  setSummary]    = useState<Summary[]>([]);
-  const [bills,    setBills]      = useState<Bill[]>([]);
-  const [health,   setHealth]     = useState<Health | null>(null);
+  const [accounts,    setAccounts]    = useState<any[]>([]);
+  const [thisMonth,   setThisMonth]   = useState<any[]>([]);
+  const [lastMonth,   setLastMonth]   = useState<any[]>([]);
+  const [bills,       setBills]       = useState<any[]>([]);
+  const [health,      setHealth]      = useState<any>(null);
+  const [showCompare, setShowCompare] = useState(false);
+
+  const currentMonthStr = monthStr(0);
+  const lastMonthStr    = monthStr(-1);
 
   useEffect(() => {
-    api.get<Account[]>("/accounts").then(setAccounts);
-    api.get<Summary[]>("/spending-summary").then(setSummary);
-    api.get<Bill[]>("/bills").then((b) => setBills(b.filter((x) => !x.paid).slice(0, 5)));
-    api.get<Health>("/health-score").then(setHealth);
+    api.get<any[]>("/accounts").then(setAccounts);
+    api.get<any[]>(`/spending-summary?month=${currentMonthStr}`).then(setThisMonth);
+    api.get<any[]>(`/spending-summary?month=${lastMonthStr}`).then(setLastMonth);
+    api.get<any[]>("/bills").then((b) => setBills(b.filter((x: any) => !x.paid).slice(0, 5)));
+    api.get<any>("/health-score").then(setHealth);
   }, []);
 
-  const totalBalance = accounts.reduce((s, a) => s + a.balance, 0);
-  const totalSpend   = summary.reduce((s, r) => s + r.total, 0);
+  const totalBalance    = accounts.reduce((s, a) => s + a.balance, 0);
+  const totalThisSpend  = thisMonth.reduce((s, r) => s + r.total, 0);
+  const totalLastSpend  = lastMonth.reduce((s, r) => s + r.total, 0);
+  const spendDiff       = totalThisSpend - totalLastSpend;
+
+  const allCategories = Array.from(new Set([...thisMonth.map(r => r.category), ...lastMonth.map(r => r.category)]));
+  const compareData = allCategories.map(cat => ({
+    category: cat,
+    [monthLabel(currentMonthStr)]: thisMonth.find(r => r.category === cat)?.total ?? 0,
+    [monthLabel(lastMonthStr)]:    lastMonth.find(r => r.category === cat)?.total ?? 0,
+  }));
 
   return (
     <div>
       <div className="page-header">
         <h1 className="page-title">Dashboard</h1>
-        <span style={{ color: "var(--text-light)", fontSize: "0.85rem" }}>
+        <span style={{ color:"var(--text-light)", fontSize:"0.85rem" }}>
           {new Date().toLocaleDateString("en-US", { weekday:"long", year:"numeric", month:"long", day:"numeric" })}
         </span>
       </div>
 
-      {/* Stat row */}
       <div className="stat-row">
         <div className="stat-chip">
           <div className="label">Total Balance</div>
           <div className="value green">${totalBalance.toFixed(2)}</div>
         </div>
         <div className="stat-chip">
-          <div className="label">Monthly Spend</div>
-          <div className="value red">${totalSpend.toFixed(2)}</div>
+          <div className="label">This Month's Spend</div>
+          <div className="value red">${totalThisSpend.toFixed(2)}</div>
         </div>
         <div className="stat-chip">
-          <div className="label">Accounts</div>
-          <div className="value">{accounts.length}</div>
+          <div className="label">vs Last Month</div>
+          <div className={`value ${spendDiff <= 0 ? "green" : "red"}`}>
+            {spendDiff >= 0 ? "+" : ""}${spendDiff.toFixed(2)}
+          </div>
         </div>
         {health && (
           <div className="stat-chip">
@@ -62,42 +88,69 @@ export default function Dashboard() {
       </div>
 
       <div className="grid-2">
-        {/* Spending donut */}
         <div className="card">
-          <div className="card-title">Spending Summary</div>
-          {summary.length === 0 ? (
-            <div className="empty-state">No expense data yet.</div>
-          ) : (
-            <div className="donut-wrap">
-              <ResponsiveContainer width={180} height={180}>
-                <PieChart>
-                  <Pie data={summary} dataKey="total" nameKey="category"
-                    cx="50%" cy="50%" innerRadius={55} outerRadius={80}>
-                    {summary.map((_, i) => (
-                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(v) => (v != null ? `$${Number(v).toFixed(2)}` : "")} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="donut-legend">
-                {summary.map((row, i) => (
-                  <div className="legend-item" key={row.category}>
-                    <div className="legend-dot" style={{ background: COLORS[i % COLORS.length] }} />
-                    <span>{CATEGORY_LABELS[row.category] ?? row.category}</span>
-                    <span style={{ color:"var(--text-light)", marginLeft:"auto", paddingLeft:12 }}>
-                      {((row.total / totalSpend) * 100).toFixed(1)}%
-                    </span>
-                  </div>
-                ))}
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
+            <div className="card-title" style={{ margin:0 }}>Spending Summary</div>
+            <button className="btn btn-sm btn-secondary" onClick={() => setShowCompare(v => !v)}>
+              {showCompare ? "Show Donut" : "Compare Months"}
+            </button>
+          </div>
+
+          {showCompare ? (
+            compareData.length === 0 ? (
+              <div className="empty-state">No data to compare.</div>
+            ) : (
+              <div>
+                <div style={{ fontSize:"0.78rem", color:"var(--text-light)", marginBottom:10, display:"flex", gap:16 }}>
+                  <span><b style={{ color:"var(--green-dark)" }}>{monthLabel(currentMonthStr)}:</b> ${totalThisSpend.toFixed(2)}</span>
+                  <span><b style={{ color:"#94a3b8" }}>{monthLabel(lastMonthStr)}:</b> ${totalLastSpend.toFixed(2)}</span>
+                </div>
+                <ResponsiveContainer width="100%" height={210}>
+                  <BarChart data={compareData} margin={{ top:0, right:0, left:-10, bottom:0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--green-pale)" />
+                    <XAxis dataKey="category" tick={{ fontSize:11, fill:"var(--text-light)" }} />
+                    <YAxis tick={{ fontSize:11, fill:"var(--text-light)" }} />
+                    <Tooltip formatter={(v) => (v != null ? `$${Number(v).toFixed(2)}` : "")} />
+                    <Legend wrapperStyle={{ fontSize:11 }} />
+                    <Bar dataKey={monthLabel(currentMonthStr)} fill="var(--green-dark)" radius={[3,3,0,0]} />
+                    <Bar dataKey={monthLabel(lastMonthStr)}    fill="#94a3b8"            radius={[3,3,0,0]} />
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
-            </div>
+            )
+          ) : (
+            thisMonth.length === 0 ? (
+              <div className="empty-state">No expense data this month.</div>
+            ) : (
+              <div className="donut-wrap">
+                <ResponsiveContainer width={180} height={180}>
+                  <PieChart>
+                    <Pie data={thisMonth} dataKey="total" nameKey="category"
+                      cx="50%" cy="50%" innerRadius={55} outerRadius={80}>
+                      {thisMonth.map((row) => (
+                        <Cell key={row.category} fill={CATEGORY_COLORS[row.category] ?? DEFAULT_COLOR} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(v) => (v != null ? `$${Number(v).toFixed(2)}` : "")} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="donut-legend">
+                  {thisMonth.map((row) => (
+                    <div className="legend-item" key={row.category}>
+                      <div className="legend-dot" style={{ background: CATEGORY_COLORS[row.category] ?? DEFAULT_COLOR }} />
+                      <span>{row.category}</span>
+                      <span style={{ color:"var(--text-light)", marginLeft:"auto", paddingLeft:12 }}>
+                        {((row.total / totalThisSpend) * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
           )}
         </div>
 
-        {/* Accounts + Upcoming */}
         <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
-          {/* Total balance overview */}
           <div className="card">
             <div className="card-title">Total Balance Overview</div>
             {accounts.map((a) => (
@@ -113,7 +166,6 @@ export default function Dashboard() {
             ))}
           </div>
 
-          {/* Upcoming bills */}
           <div className="card">
             <div className="card-title">Upcoming Events</div>
             {bills.length === 0 ? (

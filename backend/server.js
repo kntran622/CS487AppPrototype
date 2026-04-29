@@ -49,15 +49,25 @@ app.delete("/api/transactions/:id", (req, res) => {
 });
 
 // ── Spending summary (for donut chart) ────────────────────
+// Optional ?month=YYYY-MM param; defaults to current month
 app.get("/api/spending-summary", (req, res) => {
-  const rows = db
-    .prepare(
+  const month = req.query.month;
+  let rows;
+  if (month) {
+    rows = db.prepare(
+      `SELECT category, SUM(ABS(amount)) as total
+       FROM transactions
+       WHERE type='expense' AND strftime('%Y-%m', date) = ?
+       GROUP BY category`
+    ).all(month);
+  } else {
+    rows = db.prepare(
       `SELECT category, SUM(ABS(amount)) as total
        FROM transactions
        WHERE type='expense'
        GROUP BY category`
-    )
-    .all();
+    ).all();
+  }
   res.json(rows);
 });
 
